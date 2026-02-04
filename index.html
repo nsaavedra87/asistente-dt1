@@ -3,89 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DT1 Pro - Porciones Dinámicas</title>
+    <title>DT1 Cloud - Sincronizado</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
     <style>
-        :root { --primary-blue: #0d6efd; }
-        body { background-color: #f0f2f5; font-family: 'Segoe UI', sans-serif; padding-bottom: 50px; }
-        .card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .config-comida { background: white; border-radius: 15px; padding: 20px; margin-bottom: 25px; border-top: 5px solid var(--primary-blue); }
-        #scanner-visual { width: 100%; height: 200px; display: none; border-radius: 15px; overflow: hidden; border: 3px solid var(--primary-blue); position: relative; margin-bottom: 15px; }
+        :root { --primary: #4285F4; }
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        .card { border-radius: 20px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .modal-login { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:5000; display:flex; align-items:center; justify-content:center; }
+        #scanner-visual { width: 100%; height: 200px; display: none; border-radius: 15px; overflow: hidden; border: 3px solid var(--primary); margin-bottom: 15px; position: relative; }
         #scanner-visual video { width: 100%; height: 100%; object-fit: cover; }
-        .modal-custom { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
         .d-none { display: none !important; }
-        .x-small { font-size: 0.75rem; }
     </style>
 </head>
 <body>
 
-<nav class="navbar navbar-dark bg-primary sticky-top shadow-sm">
-    <div class="container d-flex justify-content-between">
-        <span class="navbar-brand fw-bold" onclick="mostrarSeccion('calculadora')" style="cursor:pointer">💉 CONTROL PORCIONES</span>
-        <div>
-            <button class="btn btn-sm btn-outline-light me-1" onclick="mostrarSeccion('historial')">📜</button>
-            <button class="btn btn-sm btn-light" onclick="mostrarSeccion('ajustes')">⚙️ Config</button>
-        </div>
+<div id="pantalla-login" class="modal-login">
+    <div class="text-center p-4">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_常_Logo.svg" width="60" class="mb-4">
+        <h3 class="fw-bold">Mi Control DT1</h3>
+        <p class="text-muted">Inicia sesión para sincronizar tus datos médicos en la nube.</p>
+        <button class="btn btn-dark btn-lg w-100 mt-3 shadow" onclick="login()">Iniciar con Google</button>
     </div>
-</nav>
+</div>
 
-<div id="modalPorciones" class="modal-custom d-none">
-    <div class="card p-4 shadow-lg w-75 mx-auto">
-        <h6 id="modalTitulo" class="fw-bold text-primary"></h6>
-        <p id="modalInfo" class="small text-muted mb-3"></p>
-        <label class="small fw-bold">Cantidad de porciones:</label>
-        <input type="number" id="inputCantidadPorcion" class="form-control form-control-lg text-center mb-3" value="1" step="0.5" inputmode="decimal">
-        <div class="row g-2">
-            <div class="col-6"><button class="btn btn-outline-secondary w-100" onclick="cerrarModal()">Cancelar</button></div>
-            <div class="col-6"><button class="btn btn-primary w-100 fw-bold" onclick="confirmarAgregarAlimento()">Añadir</button></div>
+<div id="app-principal" class="d-none">
+    <nav class="navbar navbar-light bg-white border-bottom sticky-top shadow-sm">
+        <div class="container d-flex justify-content-between">
+            <span class="navbar-brand fw-bold text-primary" onclick="mostrarSeccion('calculadora')">💉 DT1 CLOUD</span>
+            <div>
+                <button class="btn btn-light" onclick="mostrarSeccion('historial')">📜</button>
+                <button class="btn btn-light" onclick="mostrarSeccion('ajustes')">⚙️</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-3">
+        <div id="seccion-calculadora">
+            <div class="card p-4 text-center">
+                <h6 id="txt-horario" class="badge bg-primary mb-3 mx-auto">Cargando...</h6>
+                <div id="scanner-visual"></div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="small fw-bold">GLICEMIA</label>
+                        <input type="number" id="inputGlicemia" class="form-control form-control-lg text-center fw-bold border-primary" placeholder="0" inputmode="numeric">
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold">CARBOS</label>
+                        <input type="number" id="inputCarbos" class="form-control form-control-lg text-center fw-bold border-success" readonly value="0">
+                    </div>
+                </div>
+                <div class="input-group mb-3">
+                    <input type="text" id="buscador" class="form-control" placeholder="Buscar alimento..." oninput="buscarAlimento()">
+                    <button class="btn btn-outline-primary" onclick="toggleScanner()">📷</button>
+                    <button class="btn btn-outline-secondary" onclick="limpiarSeleccion()">🧹</button>
+                </div>
+                <div id="sugerencias" class="list-group position-absolute w-100 shadow-lg" style="z-index:1000;"></div>
+                <div id="resumen-comida" class="p-2 border rounded bg-light mb-3 d-none text-start small">
+                    <ul id="lista-items" class="list-unstyled mb-0"></ul>
+                </div>
+                <button class="btn btn-primary w-100 py-3 fw-bold shadow" onclick="calcular()">CALCULAR INSULINA</button>
+            </div>
+
+            <div id="resultado" class="alert alert-primary mt-3 d-none shadow text-center">
+                <h1 id="dosis-total" class="display-1 fw-bold mb-0">0.0</h1>
+                <div id="detalle-txt" class="small mt-2"></div>
+                <button class="btn btn-success w-100 py-3 mt-3 fw-bold" onclick="confirmar()">GUARDAR EN NUBE</button>
+            </div>
+        </div>
+
+        <div id="seccion-historial" class="d-none">
+            <h5 class="fw-bold mb-3">Historial en la Nube</h5>
+            <div id="lista-historial"></div>
+        </div>
+
+        <div id="seccion-ajustes" class="d-none">
+            <div class="d-flex justify-content-between mb-3 align-items-center">
+                <h5 class="fw-bold mb-0">Configuración</h5>
+                <button class="btn btn-sm btn-outline-danger" onclick="logout()">Cerrar Sesión</button>
+            </div>
+            <div id="ajustes-container"></div>
+            <button class="btn btn-success w-100 py-3 fw-bold shadow mb-5" onclick="guardarConfig()">GUARDAR CAMBIOS</button>
         </div>
     </div>
 </div>
 
-<div class="container mt-3">
-    <div id="seccion-calculadora">
-        <div class="card p-4 mb-3 text-center">
-            <h5 id="txt-comida-actual" class="text-primary fw-bold mb-3">---</h5>
-            <div id="scanner-visual"></div>
-            <div class="row g-2 mb-4">
-                <div class="col-6">
-                    <label class="x-small fw-bold text-muted uppercase">Glicemia (mg/dL)</label>
-                    <input type="number" id="inputGlicemia" class="form-control form-control-lg text-center border-2 border-primary fw-bold" placeholder="0">
-                </div>
-                <div class="col-6">
-                    <label class="x-small fw-bold text-muted uppercase">Carbos Totales (g)</label>
-                    <input type="number" id="inputCarbos" class="form-control form-control-lg text-center border-2 border-success fw-bold" readonly placeholder="0">
-                </div>
-            </div>
-            <div class="input-group mb-3 shadow-sm">
-                <input type="text" id="buscadorAlimento" class="form-control border-0" placeholder="Buscar alimento..." oninput="buscarAlimento()">
-                <button class="btn btn-dark" onclick="toggleScanner()">📷</button>
-                <button class="btn btn-outline-secondary" onclick="limpiarSeleccion()">🧹</button>
-            </div>
-            <div id="sugerenciasAlimentos" class="list-group position-absolute w-100" style="z-index:1000; max-height: 250px; overflow-y: auto;"></div>
-            <div id="comida-actual" class="p-2 border rounded bg-light mb-3 d-none small text-start shadow-sm">
-                <ul id="lista-porciones" class="list-unstyled mb-0"></ul>
-            </div>
-            <button class="btn btn-primary w-100 py-3 fw-bold shadow" onclick="ejecutarCalculo()">CALCULAR DOSIS FINAL</button>
+<div id="modal-p" class="d-none" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:6000; display:flex; align-items:center; justify-content:center;">
+    <div class="card p-4 w-75">
+        <h5 id="p-titulo" class="fw-bold"></h5>
+        <p id="p-info" class="small text-muted"></p>
+        <label class="small fw-bold mb-1">Cant. Porciones:</label>
+        <input type="number" id="p-cant" class="form-control form-control-lg text-center mb-3" value="1" step="0.5">
+        <div class="row g-2">
+            <div class="col-6"><button class="btn btn-light w-100" onclick="cerrarModal()">Cancelar</button></div>
+            <div class="col-6"><button class="btn btn-primary w-100" onclick="addAlimento()">Añadir</button></div>
         </div>
-
-        <div id="resultadoContainer" class="alert alert-info d-none shadow border-0 text-center">
-            <h1 id="valorDosis" class="display-2 fw-bold mb-0">0.0 U</h1>
-            <div id="detalleCalculo" class="small mt-2 p-2 bg-white rounded text-dark text-start shadow-sm"></div>
-            <button class="btn btn-success w-100 py-3 fw-bold mt-3 rounded-3" onclick="confirmarInyeccion()">✅ CONFIRMAR</button>
-        </div>
-    </div>
-
-    <div id="seccion-historial" class="d-none">
-        <h5 class="fw-bold mb-3">Bitácora</h5>
-        <div id="listaHistorial"></div>
-    </div>
-
-    <div id="seccion-ajustes" class="d-none">
-        <h5 class="fw-bold text-dark mb-3">Configuración</h5>
-        <div id="config-comidas-container"></div>
-        <button class="btn btn-success btn-lg w-100 fw-bold shadow mb-4" onclick="guardarAjustes()">GUARDAR TODO</button>
     </div>
 </div>
 
