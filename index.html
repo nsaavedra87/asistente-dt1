@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DT1 Pro - Tablas Dinámicas</title>
+    <title>DT1 Pro - Porciones Dinámicas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
     <style>
-        :root { --primary-blue: #0d6efd; --light-gray: #f8f9fa; }
+        :root { --primary-blue: #0d6efd; }
         body { background-color: #f0f2f5; font-family: 'Segoe UI', sans-serif; padding-bottom: 50px; }
         .card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .btn-xl { padding: 15px; font-weight: bold; border-radius: 12px; }
         .config-comida { background: white; border-radius: 15px; padding: 20px; margin-bottom: 25px; border-top: 5px solid var(--primary-blue); }
-        .rango-fila { background: #fdfdfd; border: 1px solid #eee; border-radius: 8px; padding: 8px; margin-bottom: 5px; }
         #scanner-visual { width: 100%; height: 200px; display: none; border-radius: 15px; overflow: hidden; border: 3px solid var(--primary-blue); position: relative; margin-bottom: 15px; }
         #scanner-visual video { width: 100%; height: 100%; object-fit: cover; }
+        .modal-custom { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
         .d-none { display: none !important; }
         .x-small { font-size: 0.75rem; }
     </style>
@@ -23,7 +22,7 @@
 
 <nav class="navbar navbar-dark bg-primary sticky-top shadow-sm">
     <div class="container d-flex justify-content-between">
-        <span class="navbar-brand fw-bold" onclick="mostrarSeccion('calculadora')" style="cursor:pointer">💉 CONTROL DINÁMICO</span>
+        <span class="navbar-brand fw-bold" onclick="mostrarSeccion('calculadora')" style="cursor:pointer">💉 CONTROL PORCIONES</span>
         <div>
             <button class="btn btn-sm btn-outline-light me-1" onclick="mostrarSeccion('historial')">📜</button>
             <button class="btn btn-sm btn-light" onclick="mostrarSeccion('ajustes')">⚙️ Config</button>
@@ -31,40 +30,47 @@
     </div>
 </nav>
 
+<div id="modalPorciones" class="modal-custom d-none">
+    <div class="card p-4 shadow-lg w-75 mx-auto">
+        <h6 id="modalTitulo" class="fw-bold text-primary"></h6>
+        <p id="modalInfo" class="small text-muted mb-3"></p>
+        <label class="small fw-bold">Cantidad de porciones:</label>
+        <input type="number" id="inputCantidadPorcion" class="form-control form-control-lg text-center mb-3" value="1" step="0.5" inputmode="decimal">
+        <div class="row g-2">
+            <div class="col-6"><button class="btn btn-outline-secondary w-100" onclick="cerrarModal()">Cancelar</button></div>
+            <div class="col-6"><button class="btn btn-primary w-100 fw-bold" onclick="confirmarAgregarAlimento()">Añadir</button></div>
+        </div>
+    </div>
+</div>
+
 <div class="container mt-3">
     <div id="seccion-calculadora">
         <div class="card p-4 mb-3 text-center">
             <h5 id="txt-comida-actual" class="text-primary fw-bold mb-3">---</h5>
-            
             <div id="scanner-visual"></div>
-
             <div class="row g-2 mb-4">
                 <div class="col-6">
                     <label class="x-small fw-bold text-muted uppercase">Glicemia (mg/dL)</label>
                     <input type="number" id="inputGlicemia" class="form-control form-control-lg text-center border-2 border-primary fw-bold" placeholder="0">
                 </div>
                 <div class="col-6">
-                    <label class="x-small fw-bold text-muted uppercase">Carbos (g)</label>
-                    <input type="number" id="inputCarbos" class="form-control form-control-lg text-center border-2 border-success fw-bold" placeholder="0">
+                    <label class="x-small fw-bold text-muted uppercase">Carbos Totales (g)</label>
+                    <input type="number" id="inputCarbos" class="form-control form-control-lg text-center border-2 border-success fw-bold" readonly placeholder="0">
                 </div>
             </div>
-
             <div class="input-group mb-3 shadow-sm">
-                <input type="text" id="buscadorAlimento" class="form-control border-0" placeholder="Buscar/Escanear..." oninput="buscarAlimento()">
+                <input type="text" id="buscadorAlimento" class="form-control border-0" placeholder="Buscar alimento..." oninput="buscarAlimento()">
                 <button class="btn btn-dark" onclick="toggleScanner()">📷</button>
                 <button class="btn btn-outline-secondary" onclick="limpiarSeleccion()">🧹</button>
             </div>
-            <div id="sugerenciasAlimentos" class="list-group position-absolute w-100" style="z-index:1000;"></div>
-
-            <div id="comida-actual" class="p-2 border rounded bg-light mb-3 d-none small text-start">
+            <div id="sugerenciasAlimentos" class="list-group position-absolute w-100" style="z-index:1000; max-height: 250px; overflow-y: auto;"></div>
+            <div id="comida-actual" class="p-2 border rounded bg-light mb-3 d-none small text-start shadow-sm">
                 <ul id="lista-porciones" class="list-unstyled mb-0"></ul>
             </div>
-
-            <button class="btn btn-primary w-100 btn-xl shadow" onclick="ejecutarCalculo()">CALCULAR DOSIS</button>
+            <button class="btn btn-primary w-100 py-3 fw-bold shadow" onclick="ejecutarCalculo()">CALCULAR DOSIS FINAL</button>
         </div>
 
         <div id="resultadoContainer" class="alert alert-info d-none shadow border-0 text-center">
-            <p class="mb-1 small fw-bold uppercase">Inyectar ahora:</p>
             <h1 id="valorDosis" class="display-2 fw-bold mb-0">0.0 U</h1>
             <div id="detalleCalculo" class="small mt-2 p-2 bg-white rounded text-dark text-start shadow-sm"></div>
             <button class="btn btn-success w-100 py-3 fw-bold mt-3 rounded-3" onclick="confirmarInyeccion()">✅ CONFIRMAR</button>
@@ -77,7 +83,7 @@
     </div>
 
     <div id="seccion-ajustes" class="d-none">
-        <h5 class="fw-bold text-dark mb-3">Ajustes de Escalas</h5>
+        <h5 class="fw-bold text-dark mb-3">Configuración</h5>
         <div id="config-comidas-container"></div>
         <button class="btn btn-success btn-lg w-100 fw-bold shadow mb-4" onclick="guardarAjustes()">GUARDAR TODO</button>
     </div>
